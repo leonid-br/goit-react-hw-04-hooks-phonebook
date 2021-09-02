@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useState, useEffect } from 'react';
 import shortid from 'shortid';
 import ContactForm from './ContactForm';
 import Filter from './Filter';
@@ -7,30 +7,31 @@ import Container from './Container';
 import Heading from './Heading';
 import Notification from './Notification';
 
-class App extends Component {
-    state = {
-        contacts: [],
+const useLocalStorage = (key, defValue) => {
+    const [state, setState] = useState(
+        () => JSON.parse(window.localStorage.getItem(key)) ?? defValue,
+    );
 
-        filter: '',
-    };
+    useEffect(() => {
+        window.localStorage.setItem(key, JSON.stringify(state));
+    }, [key, state]);
 
-    componentDidMount() {
-        const parsedContacts = JSON.parse(localStorage.getItem('contacts'));
+    return [state, setState];
+};
 
-        if (parsedContacts) {
-            this.setState({ contacts: parsedContacts });
-        }
-    }
+const App = () => {
+    const [contacts, setContacts] = useLocalStorage('contacts', []);
 
-    componentDidUpdate(prevProps, prevState) {
-        const { contacts } = this.state;
-        if (contacts !== prevState.contacts) {
-            localStorage.setItem('contacts', JSON.stringify(contacts));
-        }
-    }
+    // const [contacts, setContacts] = useState(
+    //     () => JSON.parse(window.localStorage.getItem('contacts')) ?? [],
+    // );
+    const [filter, setFilter] = useState('');
 
-    addContact = (name, number) => {
-        const { contacts } = this.state;
+    // useEffect(() => {
+    //     window.localStorage.setItem('contacts', JSON.stringify(contacts));
+    // }, [contacts]);
+
+    const addContact = (name, number) => {
         const normalizeName = name.toLowerCase();
         const checkedName = contacts.find(
             ({ name }) => normalizeName === name.toLowerCase(),
@@ -48,56 +49,49 @@ class App extends Component {
             );
         }
 
-        this.setState(prevState => ({
-            contacts: [newContact, ...prevState.contacts],
-        }));
+        setContacts(prevState => [newContact, ...prevState]);
     };
 
-    changeFilter = e => {
-        this.setState({
-            filter: e.currentTarget.value,
-        });
+    const changeFilter = e => {
+        setFilter(e.currentTarget.value);
     };
 
-    findContact = () => {
-        const { filter, contacts } = this.state;
+    const findContact = () => {
         const normalizeFilter = filter.toLowerCase();
-        // сделать условие что контакта нет если фильтр не нашел
-        return contacts.filter(contact =>
+
+        const findContact = contacts.filter(contact =>
             contact.name.toLowerCase().includes(normalizeFilter),
         );
+
+        if (findContact.length === 0) {
+            alert(`No contact ${normalizeFilter.toUpperCase()}`);
+        }
+
+        return findContact;
+    };
+    const onDelete = idContact => {
+        setContacts(contacts.filter(({ id }) => id !== idContact));
     };
 
-    onDelete = idContact => {
-        this.setState(prevState => ({
-            contacts: prevState.contacts.filter(({ id }) => id !== idContact),
-        }));
-    };
+    return (
+        <Container>
+            <Heading title={'Phonebook'} />
+            <ContactForm onSubmit={addContact} />
+            <Heading title={'Contacts'} />
+            {contacts.length >= 2 && (
+                <Filter value={filter} onChange={changeFilter} />
+            )}
 
-    render() {
-        const { addContact, changeFilter, findContact, onDelete } = this;
-        const { contacts, filter } = this.state;
-
-        return (
-            <Container>
-                <Heading title={'Phonebook'} />
-                <ContactForm onSubmit={addContact} />
-                <Heading title={'Contacts'} />
-                {contacts.length >= 2 && (
-                    <Filter value={filter} onChange={changeFilter} />
-                )}
-
-                {contacts.length > 0 ? (
-                    <ContactList
-                        contactsArr={findContact()}
-                        deleteContact={onDelete}
-                    />
-                ) : (
-                    <Notification />
-                )}
-            </Container>
-        );
-    }
-}
+            {contacts.length > 0 ? (
+                <ContactList
+                    contactsArr={findContact()}
+                    deleteContact={onDelete}
+                />
+            ) : (
+                <Notification />
+            )}
+        </Container>
+    );
+};
 
 export default App;
